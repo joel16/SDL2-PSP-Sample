@@ -8,6 +8,25 @@ PSP_MODULE_INFO("SDL2", 0, 1, 1);
 /* Define the main thread's attribute value (optional) */
 PSP_MAIN_THREAD_ATTR(THREAD_ATTR_USER | THREAD_ATTR_VFPU);
 
+#define MUS_PATH "Roland-GR-1-Trumpet-C5.wav"
+
+// variable declarations
+static Uint8 *audio_pos; // global pointer to the audio buffer to be played
+static Uint32 audio_len; // remaining length of the sample we have to play
+
+void my_audio_callback(void *userdata, Uint8 *stream, int len) {
+	
+	if (audio_len == 0)
+		return;
+	
+	len = (len > audio_len ? audio_len : len);
+	SDL_memcpy(stream, audio_pos, len); 					// simply copy from one buffer into the other
+	//SDL_MixAudio(stream, audio_pos, len, SDL_MIX_MAXVOLUME);// mix from one buffer into another
+	
+	audio_pos += len;
+	audio_len -= len;
+}
+
 void draw_rects(SDL_Renderer *renderer, int x, int y) {
     // R
     SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
@@ -34,7 +53,7 @@ int main(int argc, char *argv[]) {
 
 	// SET THIS TO ACTIVATE joystick
 	SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK) < 0) {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK | SDL_INIT_AUDIO) < 0) {
         SDL_Log("SDL_Init: %s\n", SDL_GetError());
         return -1;
     }
@@ -65,8 +84,36 @@ int main(int argc, char *argv[]) {
 		return -1;
 	}
 
-	if (joystick)
-		SDL_Log("Joystick found: %s\n", SDL_JoystickName(joystick));
+	// Debugging
+	//if (joystick)
+	//	SDL_Log("Joystick found: %s\n", SDL_JoystickName(joystick));
+
+	// local variables
+	static Uint32 wav_length; // length of our sample
+	static Uint8 *wav_buffer; // buffer containing our audio file
+	static SDL_AudioSpec wav_spec; // the specs of our piece of music
+
+	/* Load the WAV */
+	// the specs, length and buffer of our wav are filled
+	if (SDL_LoadWAV(MUS_PATH, &wav_spec, &wav_buffer, &wav_length) == NULL) {
+		SDL_Log("SDL_LoadWAV failed: %s\n", SDL_GetError());
+		return -1;
+	}
+
+	// set the callback function
+	wav_spec.callback = my_audio_callback;
+	wav_spec.userdata = NULL;
+	audio_pos = wav_buffer; // copy sound buffer
+	audio_len = wav_length; // copy file length
+	
+	/* Open the audio device */
+	if (SDL_OpenAudio(&wav_spec, NULL) < 0){
+		SDL_Log("Couldn't open audio: %s\n", SDL_GetError());
+		return -1;
+	}
+	
+	/* Start playing */
+	SDL_PauseAudio(0);
 
     while (!done) {
         while (SDL_PollEvent(&event)) {
@@ -83,12 +130,8 @@ int main(int argc, char *argv[]) {
                     // seek for joystick #0
                     if (event.jbutton.which == 0) {
                         if (event.jbutton.button == 2) {
-                            // (Cross) button down
-                            if(w == 480) {
-                                SDL_SetWindowSize(window, 240, 136);
-                            } else {
-                                SDL_SetWindowSize(window, 480, 272);
-                            }
+							audio_pos = wav_buffer; // copy sound buffer
+							audio_len = wav_length;
                         }
 						else if (event.jbutton.button == 11) {
                             // (Start) button down
@@ -122,6 +165,9 @@ int main(int argc, char *argv[]) {
         }
     }
 
+	// shut everything down
+	SDL_CloseAudio();
+	SDL_FreeWAV(wav_buffer);
 	SDL_JoystickClose(joystick);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
