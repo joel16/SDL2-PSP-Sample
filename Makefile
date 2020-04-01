@@ -1,5 +1,5 @@
 TARGET = template
-OBJS = src/main.o data/cheetah.o data/forest.o
+OBJS = src/main.o
 
 PSP_LARGE_MEMORY = 1
 
@@ -19,12 +19,3 @@ PSP_EBOOT_TITLE = Template
 
 PSPSDK=$(shell psp-config --pspsdk-path)
 include $(PSPSDK)/lib/build.mak
-
-%.o: %.bmp
-	bin2o -i $< $@ $(addsuffix _bmp, $(basename $(notdir $<) ))
-
-%.o: %.jpg
-	bin2o -i $< $@ $(addsuffix _jpg, $(basename $(notdir $<) ))
-
-%.o: %.png
-	bin2o -i $< $@ $(addsuffix _png, $(basename $(notdir $<) ))
