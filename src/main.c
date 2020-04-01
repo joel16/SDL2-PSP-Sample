@@ -26,11 +26,14 @@ void draw_rects(SDL_Renderer *renderer, int x, int y) {
 }
 
 int main(int argc, char *argv[]) {
+	SDL_Joystick *joystick = NULL;
     SDL_Event event;
-    SDL_Window *window;
-    SDL_Renderer *renderer;
+    SDL_Window *window = NULL;
+    SDL_Renderer *renderer = NULL;
     int done = 0, x = 0, w = 480, h = 272;
 
+	// SET THIS TO ACTIVATE joystick
+	SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK) < 0) {
         SDL_Log("SDL_Init: %s\n", SDL_GetError());
         return -1;
@@ -52,11 +55,18 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    if (SDL_JoystickOpen(0) == NULL) {
+	if (SDL_NumJoysticks() < 1)
+		SDL_Log("No joysticks connected: %s\n", SDL_GetError());
+	
+    joystick = SDL_JoystickOpen(0);
+	if (joystick == NULL) {
 		SDL_Log("SDL_JoystickOpen: %s\n", SDL_GetError());
 		SDL_Quit();
 		return -1;
 	}
+
+	if (joystick)
+		SDL_Log("Joystick found: %s\n", SDL_JoystickName(joystick));
 
     while (!done) {
         while (SDL_PollEvent(&event)) {
@@ -72,7 +82,15 @@ int main(int argc, char *argv[]) {
                             event.jbutton.which, event.jbutton.button);
                     // seek for joystick #0
                     if (event.jbutton.which == 0) {
-                        if (event.jbutton.button == 11) {
+                        if (event.jbutton.button == 2) {
+                            // (Cross) button down
+                            if(w == 480) {
+                                SDL_SetWindowSize(window, 240, 136);
+                            } else {
+                                SDL_SetWindowSize(window, 480, 272);
+                            }
+                        }
+						else if (event.jbutton.button == 11) {
                             // (Start) button down
                             done = 1;
                         }
@@ -104,9 +122,11 @@ int main(int argc, char *argv[]) {
         }
     }
 
+	SDL_JoystickClose(joystick);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
-    SDL_Quit();
+	SDL_Quit();
+	sceKernelExitGame();
 
     return 0;
 }
